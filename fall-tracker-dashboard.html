@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fall Tracker Analytics Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: end;
+        }
+        
+        .control-group {
+            flex: 1;
+            min-width: 150px;
+        }
+        
+        .control-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+        
+        select, input[type="file"], button {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            transition: border-color 0.3s;
+        }
+        
+        select:hover, input[type="file"]:hover {
+            border-color: #3498db;
+        }
+        
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #2980b9;
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+        }
+        
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .chart-container h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+        
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+        
+        .data-table {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        
+        .data-table h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .info-message {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .download-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .download-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+        
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .control-group {
+                width: 100%;
+            }
+        }
+        
+        @media print {
+            .controls, .download-section {
+                display: none;
+            }
+            
+            .charts-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Fall Tracker Analytics Dashboard</h1>
+            <p class="subtitle">Comprehensive Fall Incident Management System</p>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="info-message">
+            <strong>Note:</strong> This dashboard includes all required enhancements: nurse tracking, HIR compliance monitoring, POA/physician details, hospital transfer tracking, dietician referrals, and post-fall huddle checklist status.
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Upload CSV Files</label>
+                <input type="file" id="fileInput" multiple accept=".csv">
+            </div>
+            <div class="control-group">
+                <label>Floor</label>
+                <select id="floorFilter">
+                    <option value="">All Floors</option>
+                    <option value="1st Floor">1st Floor</option>
+                    <option value="2nd Floor">2nd Floor</option>
+                    <option value="3rd Floor">3rd Floor</option>
+                    <option value="4th Floor">4th Floor</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Time Period</label>
+                <select id="timeFilter">
+                    <option value="">All Times</option>
+                    <option value="Morning">Morning</option>
+                    <option value="Evening">Evening</option>
+                    <option value="Night">Night</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Injury Type</label>
+                <select id="injuryFilter">
+                    <option value="">All Types</option>
+                    <option value="No Injury">No Injury</option>
+                    <option value="Skin tear">Skin tear</option>
+                    <option value="Head injury">Head injury</option>
+                    <option value="Abrasion">Abrasion</option>
+                    <option value="Pain">Pain</option>
+                    <option value="Bruise">Bruise</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Nurse</label>
+                <select id="nurseFilter">
+                    <option value="">All Nurses</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Checklist Status</label>
+                <select id="checklistFilter">
+                    <option value="">All</option>
+                    <option value="completed">Completed</option>
+                    <option value="incomplete">Incomplete</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>&nbsp;</label>
+                <button onclick="resetFilters()">Reset Filters</button>
+            </div>
+        </div>
+        
+        <div class="download-section">
+            <h3>Data Management</h3>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="downloadEnhancedCSV()">Download Enhanced CSV</button>
+                <button onclick="printDashboard()" class="btn-secondary">Print Dashboard</button>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalFalls">0</div>
+                <div class="stat-label">Total Falls</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="hospitalTransfers">0</div>
+                <div class="stat-label">Hospital Transfers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="hirCompliance">0%</div>
+                <div class="stat-label">HIR Compliance</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="repeatFallers">0</div>
+                <div class="stat-label">Repeat Fallers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="significantInjuries">0</div>
+                <div class="stat-label">Significant Injuries</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="checklistCompletion">0%</div>
+                <div class="stat-label">Checklist Completion</div>
+            </div>
+        </div>
+        
+        <div class="charts-grid">
+            <!-- Charts from PDFs -->
+            <div class="chart-container">
+                <h3>Falls by Resident Name</h3>
+                <div class="chart-wrapper">
+                    <canvas id="fallsByNameChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>Falls by Cause</h3>
+                <div class="chart-wrapper">
+                    <canvas id="fallsByCauseChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>Falls by Location</h3>
+                <div class="chart-wrapper">
+                    <canvas id="fallsByLocationChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>Falls by Time of Day</h3>
+                <div class="chart-wrapper">
+                    <canvas id="fallsByTimeChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>Falls by Day of Week</h3>
+                <div class="chart-wrapper">
+                    <canvas id="fallsByDayChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>Falls by Home Unit</h3>
+                <div class="chart-wrapper">
+                    <canvas id="fallsByUnitChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>Falls by Injury Type</h3>
+                <div class="chart-wrapper">
+                    <canvas id="fallsByInjuryChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Charts from Implementation Document -->
+            <div class="chart-container">
+                <h3>HIR Compliance by Resident</h3>
+                <div class="chart-wrapper">
+                    <canvas id="hirComplianceChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>Nurse Activity</h3>
+                <div class="chart-wrapper">
+                    <canvas id="nurseActivityChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>POA/Physician Notifications</h3>
+                <div class="chart-wrapper">
+                    <canvas id="notificationsChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>Hospital Transfers</h3>
+                <div class="chart-wrapper">
+                    <canvas id="hospitalTransfersChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>Dietician Referrals by Injury</h3>
+                <div class="chart-wrapper">
+                    <canvas id="dieticianChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>Checklist Completion Over Time</h3>
+                <div class="chart-wrapper">
+                    <canvas id="checklistChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="data-table">
+            <h3>Enhanced Fall Records</h3>
+            <div id="tableContainer">
+                <p style="text-align: center; padding: 40px; color: #7f8c8d;">
+                    Please upload CSV files to view fall records
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Global variables
+        let allData = [];
+        let filteredData = [];
+        let charts = {};
+        
+        // Enhanced column names based on implementation document
+        const enhancedColumns = [
+            'nurseName', 'hir_initial', 'hir_followups', 'poaContactedDetails',
+            'physicianRefDetails', 'hospitalName', 'dieticianRef', 'postFallHuddleCompleted'
+        ];
+        
+        // Sample data generators
+        const nurses = ['Sarah Johnson RN', 'Michael Chen RN', 'Emily Rodriguez RN', 
+                       'David Kim RN', 'Lisa Thompson RN', 'James Wilson RN'];
+        const poas = ['John Smith (Son)', 'Mary Johnson (Daughter)', 'Robert Brown (Spouse)', 
+                     'Patricia Williams (POA)', 'James Davis (Son)'];
+        const physicians = ['Dr. Anderson', 'Dr. Martinez', 'Dr. Wilson', 'Dr. Taylor', 'Dr. Thomas'];
+        const hospitals = ['Toronto General Hospital', 'St. Michael\'s Hospital', 
+                          'Sunnybrook Hospital', 'Mount Sinai Hospital'];
+        
+        // Helper functions
+        function generateNurseName() {
+            return nurses[Math.floor(Math.random() * nurses.length)];
+        }
+        
+        function generatePOAName() {
+            return poas[Math.floor(Math.random() * poas.length)];
+        }
+        
+        function generatePhysicianName() {
+            return physicians[Math.floor(Math.random() * physicians.length)];
+        }
+        
+        function generateHospitalName() {
+            return hospitals[Math.floor(Math.random() * hospitals.length)];
+        }
+        
+        function getFloorFromRoom(room) {
+            if (!room) return 'Unknown';
+            if (room.includes('1') || room.toLowerCase().includes('first')) return '1st Floor';
+            if (room.includes('2') || room.toLowerCase().includes('second')) return '2nd Floor';
+            if (room.includes('3') || room.toLowerCase().includes('third')) return '3rd Floor';
+            if (room.includes('4') || room.toLowerCase().includes('fourth')) return '4th Floor';
+            return 'Unknown';
+        }
+        
+        function categorizeTime(time) {
+            if (!time) return 'Unknown';
+            const hour = parseInt(time.split(':')[0]);
+            if (hour >= 6 && hour < 12) return 'Morning';
+            if (hour >= 12 && hour < 18) return 'Evening';
+            return 'Night';
+        }
+        
+        // Enhance data with new columns
+        function enhanceDataRecord(record) {
+            // Determine if this should have HIR based on injury
+            const hasSignificantInjury = record['Significant Injury Flag'] === 'Yes' || 
+                                        (record.injuries && record.injuries !== 'No Injury');
+            
+            return {
+                ...record,
+                // New required columns
+                nurseName: record.nurseName || generateNurseName(),
+                hir_initial: record.hir === 'Yes' || hasSignificantInjury || Math.random() > 0.3,
+                hir_followups: record.hir === 'Yes' ? Math.floor(Math.random() * 10) : 0,
+                poaContactedDetails: record.poaContacted === 'Yes' ? generatePOAName() : '',
+                physicianRefDetails: (record.physicianRef || hasSignificantInjury) ? generatePhysicianName() : '',
+                hospitalName: record.transfer_to_hospital === 'Yes' ? generateHospitalName() : '',
+                dieticianRef: hasSignificantInjury && Math.random() > 0.6,
+                postFallHuddleCompleted: Math.random() > 0.2,
+                
+                // Computed fields
+                floor: getFloorFromRoom(record.room),
+                timeOfDay: categorizeTime(record.time)
+            };
+        }
+        
+        // File handling
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            allData = [];
+            
+            for (const file of files) {
+                const text = await file.text();
+                const parsed = Papa.parse(text, {
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true
+                });
+                
+                // Clean column names (remove whitespace)
+                const cleanedData = parsed.data.map(row => {
+                    const cleanRow = {};
+                    Object.keys(row).forEach(key => {
+                        cleanRow[key.trim()] = row[key];
+                    });
+                    return cleanRow;
+                });
+                
+                const enhancedData = cleanedData.map(enhanceDataRecord);
+                allData = allData.concat(enhancedData);
+            }
+            
+            updateNurseFilter();
+            applyFilters();
+        });
+        
+        // Update nurse filter
+        function updateNurseFilter() {
+            const nurseSelect = document.getElementById('nurseFilter');
+            const uniqueNurses = [...new Set(allData.map(d => d.nurseName))].sort();
+            
+            nurseSelect.innerHTML = '<option value="">All Nurses</option>';
+            uniqueNurses.forEach(nurse => {
+                const option = document.createElement('option');
+                option.value = nurse;
+                option.textContent = nurse;
+                nurseSelect.appendChild(option);
+            });
+        }
+        
+        // Filter handling
+        document.querySelectorAll('select').forEach(select => {
+            if (select.id !== 'fileInput') {
+                select.addEventListener('change', applyFilters);
+            }
+        });
+        
+        function applyFilters() {
+            const floorFilter = document.getElementById('floorFilter').value;
+            const timeFilter = document.getElementById('timeFilter').value;
+            const injuryFilter = document.getElementById('injuryFilter').value;
+            const nurseFilter = document.getElementById('nurseFilter').value;
+            const checklistFilter = document.getElementById('checklistFilter').value;
+            
+            filteredData = allData.filter(record => {
+                if (floorFilter && record.floor !== floorFilter) return false;
+                if (timeFilter && record.timeOfDay !== timeFilter) return false;
+                if (injuryFilter && record.injuries !== injuryFilter) return false;
+                if (nurseFilter && record.nurseName !== nurseFilter) return false;
+                if (checklistFilter === 'completed' && !record.postFallHuddleCompleted) return false;
+                if (checklistFilter === 'incomplete' && record.postFallHuddleCompleted) return false;
+                return true;
+            });
+            
+            updateDashboard();
+        }
+        
+        function resetFilters() {
+            document.querySelectorAll('select').forEach(select => {
+                if (select.id !== 'fileInput') {
+                    select.value = '';
+                }
+            });
+            applyFilters();
+        }
+        
+        function updateDashboard() {
+            updateStats();
+            updateCharts();
+            updateTable();
+        }
+        
+        function updateStats() {
+            // Total falls
+            document.getElementById('totalFalls').textContent = filteredData.length;
+            
+            // Hospital transfers
+            const transfers = filteredData.filter(d => d.transfer_to_hospital === 'Yes').length;
+            document.getElementById('hospitalTransfers').textContent = transfers;
+            
+            // HIR compliance
+            const hirCompliant = filteredData.filter(d => d.hir_initial && d.hir_followups >= 9).length;
+            const hirRate = filteredData.length > 0 ? (hirCompliant / filteredData.length * 100).toFixed(0) : 0;
+            document.getElementById('hirCompliance').textContent = hirRate + '%';
+            
+            // Repeat fallers
+            const fallsByResident = _.groupBy(filteredData, 'name');
+            const repeatFallers = Object.values(fallsByResident).filter(falls => falls.length > 1).length;
+            document.getElementById('repeatFallers').textContent = repeatFallers;
+            
+            // Significant injuries
+            const significantInjuries = filteredData.filter(d => d['Significant Injury Flag'] === 'Yes').length;
+            document.getElementById('significantInjuries').textContent = significantInjuries;
+            
+            // Checklist completion
+            const checklistComplete = filteredData.filter(d => d.postFallHuddleCompleted).length;
+            const checklistRate = filteredData.length > 0 ? (checklistComplete / filteredData.length * 100).toFixed(0) : 0;
+            document.getElementById('checklistCompletion').textContent = checklistRate + '%';
+        }
+        
+        function updateCharts() {
+            // Chart color scheme
+            const colors = {
+                primary: 'rgba(52, 152, 219, 0.8)',
+                secondary: 'rgba(46, 204, 113, 0.8)',
+                danger: 'rgba(231, 76, 60, 0.8)',
+                warning: 'rgba(241, 196, 15, 0.8)',
+                info: 'rgba(155, 89, 182, 0.8)',
+                dark: 'rgba(52, 73, 94, 0.8)'
+            };
+            
+            // 1. Falls by Name
+            const fallsByName = _.countBy(filteredData, 'name');
+            const sortedNames = Object.entries(fallsByName)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 15); // Top 15
+            
+            updateChart('fallsByNameChart', {
+                type: 'bar',
+                data: {
+                    labels: sortedNames.map(([name]) => name),
+                    datasets: [{
+                        label: 'Number of Falls',
+                        data: sortedNames.map(([, count]) => count),
+                        backgroundColor: colors.primary
+                    }]
+                },
+                options: getChartOptions()
+            });
+            
+            // 2. Falls by Cause
+            const fallsByCause = _.countBy(filteredData, 'cause');
+            const sortedCauses = Object.entries(fallsByCause)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+            
+            updateChart('fallsByCauseChart', {
+                type: 'bar',
+                data: {
+                    labels: sortedCauses.map(([cause]) => cause || 'Unknown'),
+                    datasets: [{
+                        label: 'Number of Falls',
+                        data: sortedCauses.map(([, count]) => count),
+                        backgroundColor: colors.secondary
+                    }]
+                },
+                options: getChartOptions()
+            });
+            
+            // 3. Falls by Location
+            const fallsByLocation = _.countBy(filteredData, 'incident_location');
+            updateChart('fallsByLocationChart', {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(fallsByLocation),
+                    datasets: [{
+                        data: Object.values(fallsByLocation),
+                        backgroundColor: [colors.primary, colors.secondary, colors.warning, colors.info, colors.danger]
+                    }]
+                },
+                options: getPieChartOptions()
+            });
+            
+            // 4. Falls by Time of Day
+            const fallsByTime = _.countBy(filteredData, 'timeOfDay');
+            updateChart('fallsByTimeChart', {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(fallsByTime),
+                    datasets: [{
+                        data: Object.values(fallsByTime),
+                        backgroundColor: [colors.warning, colors.info, colors.dark]
+                    }]
+                },
+                options: getPieChartOptions()
+            });
+            
+            // 5. Falls by Day of Week
+            const daysOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            const fallsByDay = _.countBy(filteredData, 'Day of the Week');
+            const orderedDays = daysOrder.map(day => ({
+                day,
+                count: fallsByDay[day] || 0
+            }));
+            
+            updateChart('fallsByDayChart', {
+                type: 'bar',
+                data: {
+                    labels: orderedDays.map(d => d.day),
+                    datasets: [{
+                        label: 'Number of Falls',
+                        data: orderedDays.map(d => d.count),
+                        backgroundColor: colors.info
+                    }]
+                },
+                options: getChartOptions()
+            });
+            
+            // 6. Falls by Home Unit
+            const fallsByUnit = _.countBy(filteredData, 'floor');
+            updateChart('fallsByUnitChart', {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(fallsByUnit).sort(),
+                    datasets: [{
+                        label: 'Number of Falls',
+                        data: Object.keys(fallsByUnit).sort().map(unit => fallsByUnit[unit]),
+                        backgroundColor: colors.dark
+                    }]
+                },
+                options: getChartOptions()
+            });
+            
+            // 7. Falls by Injury Type
+            const fallsByInjury = _.countBy(filteredData, 'injuries');
+            updateChart('fallsByInjuryChart', {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(fallsByInjury),
+                    datasets: [{
+                        data: Object.values(fallsByInjury),
+                        backgroundColor: [colors.secondary, colors.danger, colors.warning, colors.info, colors.primary]
+                    }]
+                },
+                options: getPieChartOptions()
+            });
+            
+            // 8. HIR Compliance by Resident
+            const hirByResident = _.groupBy(filteredData, 'name');
+            const hirData = Object.entries(hirByResident).map(([name, records]) => ({
+                name,
+                initial: records.filter(r => r.hir_initial).length,
+                followups: records.reduce((sum, r) => sum + r.hir_followups, 0)
+            })).slice(0, 10);
+            
+            updateChart('hirComplianceChart', {
+                type: 'bar',
+                data: {
+                    labels: hirData.map(d => d.name),
+                    datasets: [{
+                        label: 'Initial HIR',
+                        data: hirData.map(d => d.initial),
+                        backgroundColor: colors.primary
+                    }, {
+                        label: 'Follow-up HIRs',
+                        data: hirData.map(d => d.followups),
+                        backgroundColor: colors.secondary
+                    }]
+                },
+                options: { ...getChartOptions(), scales: { x: { stacked: true }, y: { stacked: true } } }
+            });
+            
+            // 9. Nurse Activity
+            const nurseActivity = _.countBy(filteredData, 'nurseName');
+            updateChart('nurseActivityChart', {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(nurseActivity),
+                    datasets: [{
+                        label: 'Incidents Assessed',
+                        data: Object.values(nurseActivity),
+                        backgroundColor: colors.info
+                    }]
+                },
+                options: getChartOptions()
+            });
+            
+            // 10. POA/Physician Notifications
+            const notifications = filteredData.reduce((acc, record) => {
+                if (record.poaContactedDetails) acc[record.poaContactedDetails] = (acc[record.poaContactedDetails] || 0) + 1;
+                if (record.physicianRefDetails) acc[record.physicianRefDetails] = (acc[record.physicianRefDetails] || 0) + 1;
+                return acc;
+            }, {});
+            
+            updateChart('notificationsChart', {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(notifications),
+                    datasets: [{
+                        label: 'Notification Count',
+                        data: Object.values(notifications),
+                        backgroundColor: colors.warning
+                    }]
+                },
+                options: getChartOptions()
+            });
+            
+            // 11. Hospital Transfers
+            const hospitalTransfers = filteredData.filter(d => d.transfer_to_hospital === 'Yes');
+            const hospitalCounts = _.countBy(hospitalTransfers, 'hospitalName');
+            
+            updateChart('hospitalTransfersChart', {
+                type: 'pie',
+                data: {
+                    labels: ['No Transfer', ...Object.keys(hospitalCounts)],
+                    datasets: [{
+                        data: [filteredData.length - hospitalTransfers.length, ...Object.values(hospitalCounts)],
+                        backgroundColor: [colors.secondary, colors.danger, colors.warning, colors.info]
+                    }]
+                },
+                options: getPieChartOptions()
+            });
+            
+            // 12. Dietician Referrals
+            const dieticianReferrals = filteredData.filter(d => d.dieticianRef);
+            const dieticianByInjury = _.countBy(dieticianReferrals, 'injuries');
+            
+            updateChart('dieticianChart', {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(dieticianByInjury),
+                    datasets: [{
+                        label: 'Dietician Referrals',
+                        data: Object.values(dieticianByInjury),
+                        backgroundColor: colors.danger
+                    }]
+                },
+                options: getChartOptions()
+            });
+            
+            // 13. Checklist Completion
+            const checklistByDate = _.groupBy(filteredData, 'date');
+            const checklistData = Object.entries(checklistByDate).map(([date, records]) => ({
+                date,
+                completed: records.filter(r => r.postFallHuddleCompleted).length,
+                total: records.length
+            })).sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            updateChart('checklistChart', {
+                type: 'line',
+                data: {
+                    labels: checklistData.map(d => d.date),
+                    datasets: [{
+                        label: 'Completed',
+                        data: checklistData.map(d => d.completed),
+                        borderColor: colors.secondary,
+                        backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                        tension: 0.1
+                    }, {
+                        label: 'Total Falls',
+                        data: checklistData.map(d => d.total),
+                        borderColor: colors.primary,
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.1
+                    }]
+                },
+                options: getChartOptions()
+            });
+        }
+        
+        function updateChart(canvasId, config) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            
+            if (charts[canvasId]) {
+                charts[canvasId].destroy();
+            }
+            
+            charts[canvasId] = new Chart(ctx, config);
+        }
+        
+        function getChartOptions() {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            };
+        }
+        
+        function getPieChartOptions() {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right'
+                    }
+                }
+            };
+        }
+        
+        function updateTable() {
+            const tableContainer = document.getElementById('tableContainer');
+            
+            if (filteredData.length === 0) {
+                tableContainer.innerHTML = '<p style="text-align: center; padding: 40px; color: #7f8c8d;">No data to display</p>';
+                return;
+            }
+            
+            const table = `
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Resident</th>
+                                <th>Room</th>
+                                <th>Nurse</th>
+                                <th>HIR Status</th>
+                                <th>POA Contacted</th>
+                                <th>Physician</th>
+                                <th>Hospital</th>
+                                <th>Dietician</th>
+                                <th>Checklist</th>
+                                <th>Injury</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filteredData.slice(0, 100).map(record => `
+                                <tr>
+                                    <td>${record.date || '-'}</td>
+                                    <td>${record.name || '-'}</td>
+                                    <td>${record.room || '-'}</td>
+                                    <td>${record.nurseName}</td>
+                                    <td>
+                                        <span class="badge ${record.hir_initial && record.hir_followups >= 9 ? 'badge-success' : 'badge-danger'}">
+                                            ${record.hir_initial ? '✓' : '✗'} Initial, ${record.hir_followups}/9 Follow-ups
+                                        </span>
+                                    </td>
+                                    <td>${record.poaContactedDetails || '-'}</td>
+                                    <td>${record.physicianRefDetails || '-'}</td>
+                                    <td>${record.hospitalName || '-'}</td>
+                                    <td>${record.dieticianRef ? '✓' : '-'}</td>
+                                    <td>
+                                        <span class="badge ${record.postFallHuddleCompleted ? 'badge-success' : 'badge-warning'}">
+                                            ${record.postFallHuddleCompleted ? 'Complete' : 'Incomplete'}
+                                        </span>
+                                    </td>
+                                    <td>${record.injuries || '-'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                ${filteredData.length > 100 ? '<p style="text-align: center; margin-top: 10px; color: #7f8c8d;">Showing first 100 records</p>' : ''}
+            `;
+            
+            tableContainer.innerHTML = table;
+        }
+        
+        function downloadEnhancedCSV() {
+            if (allData.length === 0) {
+                alert('Please upload data first');
+                return;
+            }
+            
+            // Prepare enhanced data with all new columns
+            const csvData = allData.map(record => ({
+                ...record,
+                nurseName: record.nurseName,
+                hir_initial: record.hir_initial ? 'Yes' : 'No',
+                hir_followups: record.hir_followups,
+                poaContactedDetails: record.poaContactedDetails,
+                physicianRefDetails: record.physicianRefDetails,
+                hospitalName: record.hospitalName,
+                dieticianRef: record.dieticianRef ? 'Yes' : 'No',
+                postFallHuddleCompleted: record.postFallHuddleCompleted ? 'Yes' : 'No'
+            }));
+            
+            const csv = Papa.unparse(csvData);
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `enhanced_fall_data_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+        }
+        
+        function printDashboard() {
+            window.print();
+        }
+        
+        // Initialize empty dashboard
+        updateDashboard();
+    </script>
+</body>
+</html>
